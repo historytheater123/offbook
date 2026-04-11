@@ -22,7 +22,16 @@ function StepRenderer() {
 export default function App() {
   return (
     <ScriptProvider>
-      <StepRenderer />
+      <div style={{
+        maxWidth: 390,
+        margin: '0 auto',
+        minHeight: '100dvh',
+        background: '#FAFAF8',
+        position: 'relative',
+        boxShadow: '0 0 0 1px #E5E4E0',
+      }}>
+        <StepRenderer />
+      </div>
     </ScriptProvider>
   );
 }
