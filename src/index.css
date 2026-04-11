@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;500;600&family=DM+Sans:wght@400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --color-bg: #FAFAF8;
+  --color-card: #FFFFFF;
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #6B6B6B;
+  --color-text-muted: #9B9B9B;
+  --color-border: #E5E4E0;
+  --color-surface: #F7F6F3;
+  --color-btn-primary: #1A1A1A;
+
+  --tag-easy-bg: #EAF3DE;
+  --tag-easy-text: #3B6D11;
+  --tag-medium-bg: #FAEEDA;
+  --tag-medium-text: #854F0B;
+  --tag-hard-bg: #FAECE7;
+  --tag-hard-text: #993C1D;
+  --tag-expert-bg: #FCEBEB;
+  --tag-expert-text: #A32D2D;
+  --tag-info-bg: #EEEDFE;
+  --tag-info-text: #534AB7;
+  --tag-success-bg: #E1F5EE;
+  --tag-success-text: #0F6E56;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+  min-height: 100dvh;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Source Serif 4', serif;
+  font-weight: 600;
+}
+
+button {
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+input, textarea {
+  font-family: 'DM Sans', sans-serif;
+}
