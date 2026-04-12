@@ -135,15 +135,17 @@ export function Rehearsal() {
     };
 
     if (enableTTS) {
-      speak(currentLine.text).then(doNext);
+      // Always wait at least 1s even if TTS errors/resolves instantly
+      const minPause = new Promise<void>(r => setTimeout(r, 1000));
+      Promise.all([speak(currentLine.text), minPause]).then(doNext);
     } else {
-      const timer = setTimeout(doNext, 700);
+      const timer = setTimeout(doNext, 1200);
       return () => { cancelled = true; clearTimeout(timer); };
     }
 
     return () => {
       cancelled = true;
-      if (enableTTS) cancel();
+      cancel();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLineIndex]);

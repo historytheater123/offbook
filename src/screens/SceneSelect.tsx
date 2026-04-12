@@ -24,27 +24,41 @@ export function SceneSelect() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {parsedScript.scenes.map((scene: Scene) => {
             const progress = getSceneProgress(scene.id);
+            const myLineCount = scene.lines.filter(l => l.character === selectedCharacter).length;
+            const hasMyLines = myLineCount > 0;
             return (
               <button
                 key={scene.id}
-                onClick={() => selectScene(scene)}
-                style={{ background: '#fff', border: '1px solid #E5E4E0', borderRadius: 10, padding: '14px 16px', textAlign: 'left', cursor: 'pointer' }}
+                onClick={() => hasMyLines && selectScene(scene)}
+                style={{ background: hasMyLines ? '#fff' : '#FAFAF8', border: `1px solid ${hasMyLines ? '#E5E4E0' : '#EBEBEB'}`, borderRadius: 10, padding: '14px 16px', textAlign: 'left', cursor: hasMyLines ? 'pointer' : 'default', opacity: hasMyLines ? 1 : 0.6 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 500, color: '#1A1A1A' }}>{scene.title}</div>
                     <div style={{ fontSize: 11, color: '#9B9B9B', marginTop: 2 }}>{scene.characters.join(', ')}</div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 4, background: '#EEEDFE', color: '#534AB7', flexShrink: 0, marginLeft: 8 }}>
-                    {scene.lineCount} lines
-                  </span>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8, flexDirection: 'column', alignItems: 'flex-end' }}>
+                    {hasMyLines ? (
+                      <span style={{ fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 4, background: '#EEEDFE', color: '#534AB7' }}>
+                        {myLineCount} your lines
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 4, background: '#F7F6F3', color: '#9B9B9B' }}>
+                        Not in scene
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div style={{ height: 4, background: '#E5E4E0', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${progress?.bestAccuracy || 0}%`, background: '#1A1A1A', borderRadius: 2, transition: 'width 0.3s' }} />
-                </div>
-                <div style={{ fontSize: 11, color: '#9B9B9B', marginTop: 4 }}>
-                  {progress && progress.runCount > 0 ? `Best: ${progress.bestAccuracy}% — ${progress.runCount} run-through${progress.runCount !== 1 ? 's' : ''}` : 'Not yet practiced'}
-                </div>
+                {hasMyLines && (
+                  <>
+                    <div style={{ height: 4, background: '#E5E4E0', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${progress?.bestAccuracy || 0}%`, background: '#1A1A1A', borderRadius: 2, transition: 'width 0.3s' }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9B9B9B', marginTop: 4 }}>
+                      {progress && progress.runCount > 0 ? `Best: ${progress.bestAccuracy}% — ${progress.runCount} run-through${progress.runCount !== 1 ? 's' : ''}` : 'Not yet practiced'}
+                    </div>
+                  </>
+                )}
               </button>
             );
           })}
@@ -52,7 +66,10 @@ export function SceneSelect() {
 
         <div style={{ marginTop: 'auto', paddingTop: 16 }}>
           <button
-            onClick={() => parsedScript.scenes[0] && selectScene(parsedScript.scenes[0])}
+            onClick={() => {
+              const first = parsedScript.scenes.find(s => s.lines.some(l => l.character === selectedCharacter));
+              if (first) selectScene(first);
+            }}
             style={{ background: '#1A1A1A', color: '#fff', borderRadius: 8, padding: '12px 0', fontWeight: 500, border: 'none', fontSize: 14, width: '100%', cursor: 'pointer' }}
           >
             Start rehearsal
