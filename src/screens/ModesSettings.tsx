@@ -28,7 +28,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 }
 
 export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
-  const { rehearsalMode, setRehearsalMode, enableTTS, setEnableTTS, autoAdvance, setAutoAdvance, loopTroubleLines, setLoopTroubleLines } = useScript();
+  const { rehearsalMode, setRehearsalMode, autoAdvance, setAutoAdvance, loopTroubleLines, setLoopTroubleLines } = useScript();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--color-bg)' }}>
@@ -72,7 +72,6 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
         <div style={{ fontFamily: "'Source Serif 4', serif", fontWeight: 500, fontSize: 16, color: '#1A1A1A', marginBottom: 12 }}>Settings</div>
 
         {[
-          { label: 'Read other lines aloud', desc: 'Text-to-speech for scene partners', value: enableTTS, onChange: setEnableTTS },
           { label: 'Auto-advance on 80%+', desc: 'Skip to next line when accurate', value: autoAdvance, onChange: setAutoAdvance },
           { label: 'Loop trouble lines', desc: 'Auto-repeat lines under 70%', value: loopTroubleLines, onChange: setLoopTroubleLines },
         ].map((s, i, arr) => (

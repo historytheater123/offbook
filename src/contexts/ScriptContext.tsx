@@ -8,7 +8,16 @@ const STORAGE_KEY = 'offbook_data';
 function loadPersistedData(): PersistedData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as PersistedData;
+    if (raw) {
+      const data = JSON.parse(raw) as PersistedData;
+      // Migrate: always force TTS on — reading partner lines aloud is core behaviour
+      if (!data.settings) {
+        data.settings = { enableTTS: true, autoAdvance: true, loopTroubleLines: false, defaultMode: 'prompter' };
+      } else {
+        data.settings.enableTTS = true;
+      }
+      return data;
+    }
   } catch { /* ignore */ }
   return {
     scripts: {},

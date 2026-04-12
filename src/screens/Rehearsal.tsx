@@ -152,13 +152,9 @@ export function Rehearsal() {
       else setCurrentLineIndex(currentLineIndex + 1);
     };
 
-    if (enableTTS) {
-      const minPause = new Promise<void>(r => setTimeout(r, 1000));
-      Promise.all([speak(currentLine.text), minPause]).then(doNext);
-    } else {
-      const timer = setTimeout(doNext, 1200);
-      return () => { cancelled = true; clearTimeout(timer); };
-    }
+    // Always read other characters' lines aloud
+    const minPause = new Promise<void>(r => setTimeout(r, 800));
+    Promise.all([speak(currentLine.text), minPause]).then(doNext);
 
     return () => { cancelled = true; cancel(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
