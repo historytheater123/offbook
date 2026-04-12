@@ -316,28 +316,34 @@ export function Rehearsal() {
         <div style={{ height: 16 }} />
       </div>
 
-      {/* Input bar — sticky at bottom, always visible */}
-      {isMyLine && !submitted && (
-        <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #E5E4E0', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-          <input
-            ref={inputRef}
-            value={interimTranscript || userInput}
-            onChange={e => setUserInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitLine(); }}
-            placeholder={sessionActive && isListening ? '🎙 Listening…' : 'Type your line…'}
-            style={{ flex: 1, border: `1px solid ${isListening ? '#EAB308' : '#E5E4E0'}`, borderRadius: 8, padding: '10px 12px', fontSize: 13, background: isListening ? '#FEFCE8' : '#fff', outline: 'none', fontFamily: "'DM Sans', sans-serif", transition: 'border-color 0.2s, background 0.2s' }}
-          />
-          {userInput.trim() && !isListening && (
-            <button onClick={() => submitLine()} style={{ padding: '10px 14px', background: '#1A1A1A', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>✓</button>
-          )}
-          {isSupported && (
-            <MicButton
-              isListening={sessionActive}
-              onToggle={handleMicToggle}
+      {/* Input bar — always visible so mic button is always accessible */}
+      <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #E5E4E0', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+        {isMyLine && !submitted ? (
+          <>
+            <input
+              ref={inputRef}
+              value={interimTranscript || userInput}
+              onChange={e => setUserInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submitLine(); }}
+              placeholder={sessionActive && isListening ? '🎙 Listening…' : 'Type your line…'}
+              style={{ flex: 1, border: `1px solid ${isListening ? '#EAB308' : '#E5E4E0'}`, borderRadius: 8, padding: '10px 12px', fontSize: 13, background: isListening ? '#FEFCE8' : '#fff', outline: 'none', fontFamily: "'DM Sans', sans-serif", transition: 'border-color 0.2s, background 0.2s' }}
             />
-          )}
-        </div>
-      )}
+            {userInput.trim() && !isListening && (
+              <button onClick={() => submitLine()} style={{ padding: '10px 14px', background: '#1A1A1A', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>✓</button>
+            )}
+          </>
+        ) : (
+          <div style={{ flex: 1, padding: '10px 12px', fontSize: 13, color: '#9B9B9B', fontFamily: "'DM Sans', sans-serif" }}>
+            {sessionActive ? (submitted ? '⏳ Advancing…' : '🔊 Other character speaking…') : 'Press mic to start rehearsal'}
+          </div>
+        )}
+        {isSupported && (
+          <MicButton
+            isListening={sessionActive}
+            onToggle={handleMicToggle}
+          />
+        )}
+      </div>
 
       {/* Tab bar — sticky at bottom */}
       <div style={{ display: 'flex', borderTop: '1px solid #E5E4E0', background: '#fff', paddingBottom: 4, flexShrink: 0 }}>
