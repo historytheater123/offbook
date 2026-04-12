@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useScript } from '../contexts/ScriptContext';
 import type { RehearsalMode } from '../types/index';
+import { ELEVENLABS_VOICES, DEFAULT_VOICE_ID } from '../lib/elevenlabs';
 
 export type Tab = 'script' | 'modes' | 'settings';
 
@@ -28,7 +30,15 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 }
 
 export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
-  const { rehearsalMode, setRehearsalMode, autoAdvance, setAutoAdvance, loopTroubleLines, setLoopTroubleLines } = useScript();
+  const {
+    rehearsalMode, setRehearsalMode,
+    autoAdvance, setAutoAdvance,
+    loopTroubleLines, setLoopTroubleLines,
+    elevenLabsKey, setElevenLabsKey,
+    elevenLabsVoice, setElevenLabsVoice,
+  } = useScript();
+  const [keyDraft, setKeyDraft] = useState(elevenLabsKey);
+  const [keyVisible, setKeyVisible] = useState(false);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--color-bg)' }}>
@@ -83,6 +93,96 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
             <Toggle value={s.value} onChange={s.onChange} />
           </div>
         ))}
+
+        <hr style={{ border: 'none', borderTop: '1px solid #E5E4E0', margin: '20px 0' }} />
+
+        {/* ElevenLabs realistic voice */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>Realistic AI voice</div>
+              <div style={{ fontSize: 11, color: '#9B9B9B' }}>Uses ElevenLabs · free tier available</div>
+            </div>
+            {elevenLabsKey ? (
+              <span style={{ fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 4, background: '#EAF3DE', color: '#3B6D11' }}>Active</span>
+            ) : (
+              <span style={{ fontSize: 10, fontWeight: 500, padding: '3px 8px', borderRadius: 4, background: '#F7F6F3', color: '#9B9B9B' }}>Off</span>
+            )}
+          </div>
+
+          {/* API key input */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <input
+              type={keyVisible ? 'text' : 'password'}
+              value={keyDraft}
+              onChange={e => setKeyDraft(e.target.value)}
+              placeholder="Paste ElevenLabs API key…"
+              style={{ flex: 1, border: '1px solid #E5E4E0', borderRadius: 8, padding: '9px 11px', fontSize: 12, outline: 'none', fontFamily: "'DM Sans', sans-serif", background: '#fff' }}
+            />
+            <button
+              onClick={() => setKeyVisible(v => !v)}
+              style={{ padding: '9px 10px', border: '1px solid #E5E4E0', borderRadius: 8, background: '#fff', fontSize: 11, cursor: 'pointer', color: '#6B6B6B' }}
+            >
+              {keyVisible ? 'Hide' : 'Show'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button
+              onClick={() => setElevenLabsKey(keyDraft)}
+              style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, background: '#1A1A1A', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+            >
+              Save key
+            </button>
+            {elevenLabsKey && (
+              <button
+                onClick={() => { setKeyDraft(''); setElevenLabsKey(''); }}
+                style={{ padding: '8px 12px', border: '1px solid #E5E4E0', borderRadius: 8, background: 'transparent', fontSize: 12, cursor: 'pointer', color: '#993C1D' }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+
+          <a
+            href="https://elevenlabs.io/app/settings/api-keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: '#534AB7', textDecoration: 'none' }}
+          >
+            Get a free API key →
+          </a>
+        </div>
+
+        {/* Voice picker — only shown when key is set */}
+        {elevenLabsKey && (
+          <div style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#1A1A1A', marginBottom: 8 }}>Voice</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {ELEVENLABS_VOICES.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => setElevenLabsVoice(v.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px', borderRadius: 8, border: '1px solid',
+                    borderColor: (elevenLabsVoice || DEFAULT_VOICE_ID) === v.id ? '#1A1A1A' : '#E5E4E0',
+                    background: (elevenLabsVoice || DEFAULT_VOICE_ID) === v.id ? '#F7F6F3' : '#fff',
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{v.name}</div>
+                    <div style={{ fontSize: 11, color: '#9B9B9B' }}>{v.description}</div>
+                  </div>
+                  {(elevenLabsVoice || DEFAULT_VOICE_ID) === v.id && (
+                    <span style={{ fontSize: 14, color: '#1A1A1A' }}>✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tab bar */}

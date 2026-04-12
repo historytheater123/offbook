@@ -53,6 +53,8 @@ interface ScriptContextValue {
   loopTroubleLines: boolean;
   persistedData: PersistedData;
   runAttempts: Record<string, RunAttempt>;
+  elevenLabsKey: string;
+  elevenLabsVoice: string;
   setCurrentStep: (step: AppStep) => void;
   uploadScript: (rawText: string) => void;
   selectCharacter: (name: string) => void;
@@ -62,6 +64,8 @@ interface ScriptContextValue {
   setEnableTTS: (v: boolean) => void;
   setAutoAdvance: (v: boolean) => void;
   setLoopTroubleLines: (v: boolean) => void;
+  setElevenLabsKey: (key: string) => void;
+  setElevenLabsVoice: (voiceId: string) => void;
   saveLineAccuracy: (lineId: string, accuracy: number) => void;
   saveRunStats: (accuracy: number, time: number) => void;
   getSceneProgress: (sceneId: string) => PersistedData['scripts'][string]['scenes'][string] | null;
@@ -84,6 +88,8 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
   const [enableTTS, setEnableTTSState] = useState(persisted.settings.enableTTS);
   const [autoAdvance, setAutoAdvanceState] = useState(persisted.settings.autoAdvance);
   const [loopTroubleLines, setLoopTroubleLinesState] = useState(persisted.settings.loopTroubleLines);
+  const [elevenLabsKey, setElevenLabsKeyState] = useState(persisted.settings.elevenLabsKey || '');
+  const [elevenLabsVoice, setElevenLabsVoiceState] = useState(persisted.settings.elevenLabsVoice || '');
   const [runAttempts, setRunAttempts] = useState<Record<string, RunAttempt>>({});
 
   useEffect(() => {
@@ -133,6 +139,16 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
   const setLoopTroubleLines = useCallback((v: boolean) => {
     setLoopTroubleLinesState(v);
     savePersisted({ ...persisted, settings: { ...persisted.settings, loopTroubleLines: v } });
+  }, [persisted, savePersisted]);
+
+  const setElevenLabsKey = useCallback((key: string) => {
+    setElevenLabsKeyState(key);
+    savePersisted({ ...persisted, settings: { ...persisted.settings, elevenLabsKey: key } });
+  }, [persisted, savePersisted]);
+
+  const setElevenLabsVoice = useCallback((voiceId: string) => {
+    setElevenLabsVoiceState(voiceId);
+    savePersisted({ ...persisted, settings: { ...persisted.settings, elevenLabsVoice: voiceId } });
   }, [persisted, savePersisted]);
 
   const getScriptKey = useCallback(() => {
@@ -205,9 +221,11 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
       currentLineIndex, rehearsalMode, enableTTS, autoAdvance, loopTroubleLines,
       persistedData: persisted,
       runAttempts,
+      elevenLabsKey, elevenLabsVoice,
       setCurrentStep, uploadScript, selectCharacter, selectScene,
       setRehearsalMode, setCurrentLineIndex,
       setEnableTTS, setAutoAdvance, setLoopTroubleLines,
+      setElevenLabsKey, setElevenLabsVoice,
       saveLineAccuracy, saveRunStats, getSceneProgress,
       updateRunAttempt, clearRunAttempts,
     }}>

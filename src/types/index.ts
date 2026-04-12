@@ -59,6 +59,8 @@ export interface PersistedData {
     autoAdvance: boolean;
     loopTroubleLines: boolean;
     defaultMode: string;
+    elevenLabsKey?: string;
+    elevenLabsVoice?: string;
   };
 }
 

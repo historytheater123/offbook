@@ -32,7 +32,8 @@ function WordHighlight({ expected, spoken }: { expected: string; spoken: string 
 export function Rehearsal() {
   const {
     selectedScene, selectedCharacter, currentLineIndex, setCurrentLineIndex,
-    rehearsalMode, enableTTS, loopTroubleLines,
+    rehearsalMode, loopTroubleLines,
+    elevenLabsKey, elevenLabsVoice,
     setCurrentStep, saveLineAccuracy, saveRunStats,
     updateRunAttempt, clearRunAttempts,
   } = useScript();
@@ -50,7 +51,7 @@ export function Rehearsal() {
   const isMyLineRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const lineRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const { speak, cancel } = useTextToSpeech();
+  const { speak, cancel } = useTextToSpeech(elevenLabsKey, elevenLabsVoice);
 
   const lines = selectedScene?.lines || [];
   const currentLine = lines[currentLineIndex];
@@ -269,7 +270,7 @@ export function Rehearsal() {
                   <div style={{ fontSize: 13, color: '#1A1A1A', lineHeight: 1.7 }}>
                     {getLineText(line, lines.indexOf(line))}
                   </div>
-                  {isCurrent && !isPlayer && enableTTS && (
+                  {isCurrent && !isPlayer && (
                     <div style={{ fontSize: 10, color: '#9B9B9B', marginTop: 4 }}>♪ reading aloud…</div>
                   )}
                 </div>
@@ -301,7 +302,7 @@ export function Rehearsal() {
                   <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', marginBottom: 3, color: isPlayer ? '#854F0B' : '#534AB7' }}>
                     {line.character}
                     {isCurrent && isPlayer && <span style={{ marginLeft: 6, fontWeight: 500, color: '#0F6E56' }}>— YOUR LINE</span>}
-                    {isCurrent && !isPlayer && enableTTS && <span style={{ marginLeft: 6, fontWeight: 400, color: '#9B9B9B' }}>♪</span>}
+                    {isCurrent && !isPlayer && <span style={{ marginLeft: 6, fontWeight: 400, color: '#9B9B9B' }}>♪</span>}
                   </div>
                   <div style={{ fontSize: 13, color: isPast ? '#6B6B6B' : '#1A1A1A', lineHeight: 1.75 }}>
                     {getLineText(line, idx)}
