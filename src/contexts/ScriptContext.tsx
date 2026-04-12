@@ -13,7 +13,7 @@ function loadPersistedData(): PersistedData {
   return {
     scripts: {},
     settings: {
-      enableTTS: false,
+      enableTTS: true,
       autoAdvance: true,
       loopTroubleLines: false,
       defaultMode: 'prompter',
@@ -27,6 +27,11 @@ function savePersistedData(data: PersistedData) {
   } catch { /* ignore */ }
 }
 
+export interface RunAttempt {
+  said: string;
+  accuracy: number;
+}
+
 interface ScriptContextValue {
   currentStep: AppStep;
   parsedScript: ParsedScript | null;
@@ -38,6 +43,7 @@ interface ScriptContextValue {
   autoAdvance: boolean;
   loopTroubleLines: boolean;
   persistedData: PersistedData;
+  runAttempts: Record<string, RunAttempt>;
   setCurrentStep: (step: AppStep) => void;
   uploadScript: (rawText: string) => void;
   selectCharacter: (name: string) => void;
@@ -50,6 +56,8 @@ interface ScriptContextValue {
   saveLineAccuracy: (lineId: string, accuracy: number) => void;
   saveRunStats: (accuracy: number, time: number) => void;
   getSceneProgress: (sceneId: string) => PersistedData['scripts'][string]['scenes'][string] | null;
+  updateRunAttempt: (lineId: string, said: string, accuracy: number) => void;
+  clearRunAttempts: () => void;
 }
 
 const ScriptContext = createContext<ScriptContextValue | null>(null);
@@ -67,6 +75,7 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
   const [enableTTS, setEnableTTSState] = useState(persisted.settings.enableTTS);
   const [autoAdvance, setAutoAdvanceState] = useState(persisted.settings.autoAdvance);
   const [loopTroubleLines, setLoopTroubleLinesState] = useState(persisted.settings.loopTroubleLines);
+  const [runAttempts, setRunAttempts] = useState<Record<string, RunAttempt>>({});
 
   useEffect(() => {
     const decoded = decodeScriptFromUrl();
@@ -74,7 +83,7 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsed = parseScript(decoded);
         setParsedScript(parsed);
-        setCurrentStep('upload');
+        setCurrentStep('character-select');
         history.replaceState(null, '', window.location.pathname);
       } catch { /* ignore */ }
     }
@@ -175,15 +184,23 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     return persisted.scripts[key]?.scenes[sceneId] || null;
   }, [persisted, getScriptKey]);
 
+  const updateRunAttempt = useCallback((lineId: string, said: string, accuracy: number) => {
+    setRunAttempts(prev => ({ ...prev, [lineId]: { said, accuracy } }));
+  }, []);
+
+  const clearRunAttempts = useCallback(() => setRunAttempts({}), []);
+
   return (
     <ScriptContext.Provider value={{
       currentStep, parsedScript, selectedCharacter, selectedScene,
       currentLineIndex, rehearsalMode, enableTTS, autoAdvance, loopTroubleLines,
       persistedData: persisted,
+      runAttempts,
       setCurrentStep, uploadScript, selectCharacter, selectScene,
       setRehearsalMode, setCurrentLineIndex,
       setEnableTTS, setAutoAdvance, setLoopTroubleLines,
       saveLineAccuracy, saveRunStats, getSceneProgress,
+      updateRunAttempt, clearRunAttempts,
     }}>
       {children}
     </ScriptContext.Provider>

@@ -73,10 +73,10 @@ export function parseScript(rawText: string): ParsedScript {
       continue;
     }
 
-    const match = trimmed.match(/^([A-Z][A-Z0-9 _'-]*):\s*(.+)/);
+    const match = trimmed.match(/^([A-Za-z][A-Za-z0-9 _'-]*):\s*(.+)/);
     if (!match) continue;
 
-    const character = match[1].trim();
+    const character = match[1].trim().toUpperCase();
     const rawDialogue = match[2];
     const text = cleanText(rawDialogue);
 
@@ -142,7 +142,7 @@ export function validateScript(rawText: string): { valid: boolean; error?: strin
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    const match = trimmed.match(/^([A-Z][A-Z0-9 _'-]*):\s*(.+)/);
+    const match = trimmed.match(/^([A-Za-z][A-Za-z0-9 _'-]*):\s*(.+)/);
     if (match) {
       const text = cleanText(match[2]);
       if (text) {
