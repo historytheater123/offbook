@@ -20,7 +20,7 @@ function WordHighlight({ expected, spoken }: { expected: string; spoken: string 
         const isMatch = si < spokenWords.length && clean === spokenWords[si];
         if (isMatch) si++;
         return (
-          <span key={i} style={isMatch ? { background: '#FEF08A', borderRadius: 2, padding: '0 1px' } : undefined}>
+          <span key={i} style={isMatch ? { background: '#FACC15', borderRadius: 2, padding: '0 1px' } : undefined}>
             {token}
           </span>
         );
@@ -46,6 +46,7 @@ export function Rehearsal() {
   const troubleLoopCountRef = useRef(0);
   const submitLineRef = useRef<((input?: string) => void) | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { speak, cancel } = useTextToSpeech();
 
   const lines = selectedScene?.lines || [];
@@ -61,6 +62,14 @@ export function Rehearsal() {
     troubleLoopCountRef.current = 0;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-scroll to current line
+  useEffect(() => {
+    const el = lineRefs.current[currentLine?.id || ''];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [currentLineIndex, currentLine?.id]);
 
   const doEndScene = useCallback(() => {
     const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
@@ -89,7 +98,6 @@ export function Rehearsal() {
     updateRunAttempt(currentLine.id, text, result.accuracy);
     lineScoresRef.current[currentLine.id] = result.accuracy;
 
-    // Loop trouble lines if enabled
     if (loopTroubleLines && result.accuracy < 70 && troubleLoopCountRef.current < 2) {
       troubleLoopCountRef.current++;
       setUserInput('');
@@ -101,7 +109,6 @@ export function Rehearsal() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userInput, currentLine, isMyLine, submitted, saveLineAccuracy, updateRunAttempt, loopTroubleLines]);
 
-  // Keep a stable ref so handleFinalSpeech doesn't recreate on every render
   submitLineRef.current = submitLine;
 
   const handleFinalSpeech = useCallback((text: string) => {
@@ -135,7 +142,6 @@ export function Rehearsal() {
     };
 
     if (enableTTS) {
-      // Always wait at least 1s even if TTS errors/resolves instantly
       const minPause = new Promise<void>(r => setTimeout(r, 1000));
       Promise.all([speak(currentLine.text), minPause]).then(doNext);
     } else {
@@ -162,39 +168,38 @@ export function Rehearsal() {
   };
   const modeInfo = modeLabels[rehearsalMode];
 
-  const getVisibleLines = () => {
-    if (rehearsalMode === 'full-blackout') return [];
-    if (rehearsalMode === 'cue-only') return lines.slice(Math.max(0, currentLineIndex - 1), currentLineIndex);
-    return lines.slice(Math.max(0, currentLineIndex - 2), currentLineIndex);
-  };
+  const spokenSoFar = interimTranscript || userInput;
 
-  const visibleLines = getVisibleLines();
+  // For cue-only: show just the previous line + current
+  const cueOnlyLines = rehearsalMode === 'cue-only'
+    ? lines.slice(Math.max(0, currentLineIndex - 1), currentLineIndex + 1)
+    : [];
 
-  const renderLineText = (line: typeof lines[0]) => {
+  const getLineText = (line: typeof lines[0], idx: number) => {
     const isPlayer = line.character === selectedCharacter;
+    const isCurrent = idx === currentLineIndex;
+
     if (isPlayer && rehearsalMode === 'highlight') {
       const words = line.text.split(' ');
       const keep = new Set([0, words.length - 1]);
       words.forEach((w, wi) => { if (w.length > 5) keep.add(wi); });
       return words.map((w, wi) => keep.has(wi) ? w : '___').join(' ');
     }
+    if (isPlayer && rehearsalMode === 'hidden-lines' && idx >= currentLineIndex) {
+      // blur future/current player lines in hidden mode
+      return <span style={{ filter: isCurrent ? 'blur(4px)' : 'blur(3px)', userSelect: 'none' }}>{line.text}</span>;
+    }
+    // current player line: show word highlights if speaking/typing
+    if (isCurrent && isPlayer && spokenSoFar) {
+      return <WordHighlight expected={line.text} spoken={spokenSoFar} />;
+    }
     return line.text;
   };
-
-  const cueLine = (() => {
-    for (let i = currentLineIndex - 1; i >= 0; i--) {
-      if (lines[i].character !== selectedCharacter) return lines[i];
-    }
-    return null;
-  })();
-
-  // What's been spoken so far (interim during speech, or typed text)
-  const spokenSoFar = interimTranscript || userInput;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--color-bg)' }}>
       {/* Header */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E4E0', background: '#fff' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E4E0', background: '#fff', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={() => setCurrentStep('scene-select')} style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <span style={{ display: 'inline-block', width: 16, height: 16, position: 'relative', flexShrink: 0 }}>
@@ -214,88 +219,104 @@ export function Rehearsal() {
       </div>
 
       {/* Script area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-        {rehearsalMode === 'full-blackout' ? (
-          <div style={{ textAlign: 'center', color: '#9B9B9B', padding: '24px 0', fontSize: 13 }}>Full blackout — no script visible</div>
-        ) : (
-          <>
-            {/* Previous context lines */}
-            {visibleLines.map(line => (
-              <div key={line.id} style={{ marginBottom: 10, opacity: 0.4 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: '#1A1A1A', letterSpacing: '0.03em', marginBottom: 2 }}>{line.character}</div>
-                <div style={{ fontSize: 12, color: '#6B6B6B', lineHeight: 1.6 }}>{renderLineText(line)}</div>
-              </div>
-            ))}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px' }}>
 
-            {/* Cue line box (the other character's last line before mine) */}
-            {isMyLine && cueLine && rehearsalMode !== 'cue-only' && (
-              <>
-                <hr style={{ border: 'none', borderTop: '1px solid #E5E4E0', margin: '10px 0' }} />
-                <div style={{ background: '#F7F6F3', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: '#534AB7', letterSpacing: '0.03em', marginBottom: 2 }}>{cueLine.character}</div>
-                  <div style={{ fontSize: 12, color: '#1A1A1A', fontWeight: 500, lineHeight: 1.6 }}>{cueLine.text}</div>
-                </div>
-                <hr style={{ border: 'none', borderTop: '1px solid #E5E4E0', margin: '10px 0' }} />
-              </>
-            )}
+        {/* Full blackout */}
+        {rehearsalMode === 'full-blackout' && (
+          <div style={{ textAlign: 'center', color: '#9B9B9B', padding: '40px 0', fontSize: 13 }}>
+            Full blackout — no script visible
+          </div>
+        )}
 
-            {/* Cue-only mode: show previous line */}
-            {rehearsalMode === 'cue-only' && visibleLines.map(line => (
-              <div key={`cue-${line.id}`} style={{ marginBottom: 10, opacity: 0.4 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: '#1A1A1A', letterSpacing: '0.03em', marginBottom: 2 }}>{line.character}</div>
-                <div style={{ fontSize: 12, color: '#6B6B6B', lineHeight: 1.6 }}>{line.text}</div>
-              </div>
-            ))}
-
-            {/* Other character's line currently being read */}
-            {!isMyLine && currentLine && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: '#534AB7', letterSpacing: '0.03em', marginBottom: 2 }}>{currentLine.character}</div>
-                <div style={{ fontSize: 13, color: '#1A1A1A', lineHeight: 1.6 }}>{currentLine.text}</div>
-                {enableTTS && (
-                  <div style={{ fontSize: 11, color: '#9B9B9B', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#534AB7', animation: 'pulse 1s ease-in-out infinite' }} />
-                    Reading aloud…
+        {/* Cue-only: just previous line + current */}
+        {rehearsalMode === 'cue-only' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {cueOnlyLines.map((line) => {
+              const isPlayer = line.character === selectedCharacter;
+              const isCurrent = lines.indexOf(line) === currentLineIndex;
+              const isPast = lines.indexOf(line) < currentLineIndex;
+              return (
+                <div key={line.id} ref={el => { lineRefs.current[line.id] = el; }}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    background: isPlayer ? (isCurrent ? '#FEF08A' : '#FEFCE8') : (isCurrent ? '#F7F6F3' : 'transparent'),
+                    opacity: isPast ? 0.4 : 1,
+                    border: isCurrent ? '1px solid #E5E4E0' : '1px solid transparent',
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 600, color: isPlayer ? '#854F0B' : '#534AB7', letterSpacing: '0.05em', marginBottom: 3 }}>
+                    {line.character}{isCurrent && isPlayer ? ' — YOUR LINE' : ''}
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* My line prompt with yellow word highlighting */}
-            {isMyLine && !submitted && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: '#0F6E56', letterSpacing: '0.03em', marginBottom: 4 }}>YOUR LINE ({selectedCharacter})</div>
-                {rehearsalMode === 'hidden-lines' ? (
-                  <div style={{ fontSize: 13, color: '#1A1A1A', lineHeight: 1.7, filter: 'blur(4px)', userSelect: 'none' }}>
-                    {currentLine?.text}
-                  </div>
-                ) : (
                   <div style={{ fontSize: 13, color: '#1A1A1A', lineHeight: 1.7 }}>
-                    {spokenSoFar ? (
-                      <WordHighlight expected={currentLine?.text || ''} spoken={spokenSoFar} />
-                    ) : (
-                      <span style={{ color: '#C4C4C4' }}>
-                        {renderLineText(currentLine)}
-                      </span>
+                    {getLineText(line, lines.indexOf(line))}
+                  </div>
+                  {isCurrent && !isPlayer && enableTTS && (
+                    <div style={{ fontSize: 10, color: '#9B9B9B', marginTop: 4 }}>♪ reading aloud…</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Full script view: prompter, highlight, hidden-lines */}
+        {rehearsalMode !== 'full-blackout' && rehearsalMode !== 'cue-only' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {lines.map((line, idx) => {
+              const isPlayer = line.character === selectedCharacter;
+              const isCurrent = idx === currentLineIndex;
+              const isPast = idx < currentLineIndex;
+
+              // Background colour
+              let bg = 'transparent';
+              if (isPlayer && !isPast) bg = isCurrent ? '#FEF08A' : '#FEFCE8';
+              if (!isPlayer && isCurrent) bg = '#F0EFEB';
+
+              return (
+                <div
+                  key={line.id}
+                  ref={el => { lineRefs.current[line.id] = el; }}
+                  style={{
+                    padding: '9px 10px',
+                    borderRadius: 8,
+                    background: bg,
+                    opacity: isPast ? 0.38 : 1,
+                    transition: 'opacity 0.4s, background 0.2s',
+                    borderLeft: isCurrent ? `3px solid ${isPlayer ? '#EAB308' : '#534AB7'}` : '3px solid transparent',
+                  }}
+                >
+                  <div style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: '0.05em',
+                    marginBottom: 3,
+                    color: isPlayer ? '#854F0B' : '#534AB7',
+                  }}>
+                    {line.character}
+                    {isCurrent && isPlayer && (
+                      <span style={{ marginLeft: 6, fontWeight: 500, color: '#0F6E56' }}>— YOUR LINE</span>
+                    )}
+                    {isCurrent && !isPlayer && enableTTS && (
+                      <span style={{ marginLeft: 6, fontWeight: 400, color: '#9B9B9B' }}>♪</span>
                     )}
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* Brief submitted indicator */}
-            {submitted && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0F6E56', fontSize: 12, fontWeight: 500, padding: '8px 0' }}>
-                <span style={{ fontSize: 16 }}>✓</span> Got it — next up…
-              </div>
-            )}
-          </>
+                  <div style={{ fontSize: 13, color: isPast ? '#6B6B6B' : '#1A1A1A', lineHeight: 1.75 }}>
+                    {getLineText(line, idx)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
+
+        {/* Extra padding at bottom so last lines aren't hidden behind input bar */}
+        <div style={{ height: 80 }} />
       </div>
 
-      {/* Input bar — only show when it's my line and not yet submitted */}
+      {/* Input bar — only when it's my line and not submitted */}
       {isMyLine && !submitted && (
-        <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #E5E4E0', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #E5E4E0', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           <input
             ref={inputRef}
             value={interimTranscript || userInput}
@@ -314,7 +335,7 @@ export function Rehearsal() {
       )}
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', borderTop: '1px solid #E5E4E0', background: '#fff', paddingBottom: 4 }}>
+      <div style={{ display: 'flex', borderTop: '1px solid #E5E4E0', background: '#fff', paddingBottom: 4, flexShrink: 0 }}>
         {(['script', 'modes', 'settings'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '8px 0 4px', border: 'none', background: 'transparent', cursor: 'pointer' }}>
             <div style={{ width: 18, height: 18, borderRadius: 4, background: tab === t ? '#1A1A1A' : '#E5E4E0' }} />
