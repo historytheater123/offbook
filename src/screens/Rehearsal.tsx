@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useScript } from '../contexts/ScriptContext';
 import { compareLine } from '../lib/lineCompare';
-import { MicButton } from '../components/MicButton';
+import React from 'react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
 import { unlockAudio } from '../lib/elevenlabs';
@@ -319,7 +319,7 @@ export function Rehearsal() {
         <div style={{ height: 16 }} />
       </div>
 
-      {/* Input bar — always visible so mic button is always accessible */}
+      {/* Input bar — always visible */}
       <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #E5E4E0', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
         {isMyLine && !submitted ? (
           <>
@@ -336,24 +336,56 @@ export function Rehearsal() {
             )}
           </>
         ) : (
-          <div style={{ flex: 1, padding: '10px 12px', fontSize: 13, color: '#9B9B9B', fontFamily: "'DM Sans', sans-serif" }}>
-            {sessionActive ? (submitted ? '⏳ Advancing…' : '🔊 Other character speaking…') : 'Press mic to start rehearsal'}
+          <div style={{ flex: 1, padding: '4px 0', fontSize: 13, color: '#9B9B9B', fontFamily: "'DM Sans', sans-serif" }}>
+            {sessionActive ? (submitted ? 'Advancing…' : '🔊 Other character speaking…') : 'Tap Start to begin rehearsal'}
           </div>
         )}
         {isSupported && (
-          <MicButton
-            isListening={sessionActive}
-            onToggle={handleMicToggle}
-          />
+          sessionActive ? (
+            <button
+              onClick={handleMicToggle}
+              style={{ padding: '10px 20px', background: '#E53E3E', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, letterSpacing: '0.02em' }}
+            >
+              ■ Stop
+            </button>
+          ) : (
+            <button
+              onClick={handleMicToggle}
+              style={{ padding: '10px 20px', background: '#1A6B3C', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, letterSpacing: '0.02em' }}
+            >
+              ▶ Start
+            </button>
+          )
         )}
       </div>
 
       {/* Tab bar — sticky at bottom */}
       <div style={{ display: 'flex', borderTop: '1px solid #E5E4E0', background: '#fff', paddingBottom: 4, flexShrink: 0 }}>
-        {(['script', 'modes', 'settings'] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '8px 0 4px', border: 'none', background: 'transparent', cursor: 'pointer' }}>
-            <div style={{ width: 18, height: 18, borderRadius: 4, background: tab === t ? '#1A1A1A' : '#E5E4E0' }} />
-            <span style={{ fontSize: 10, fontWeight: tab === t ? 600 : 400, color: tab === t ? '#1A1A1A' : '#9B9B9B', textTransform: 'capitalize' }}>{t}</span>
+        {([
+          { id: 'script', label: 'Script', icon: (active: boolean) => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#1A1A1A' : '#9B9B9B'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+            </svg>
+          )},
+          { id: 'modes', label: 'Modes', icon: (active: boolean) => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#1A1A1A' : '#9B9B9B'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+              <circle cx="9" cy="6" r="2" fill={active ? '#1A1A1A' : '#9B9B9B'} stroke="none"/>
+              <circle cx="15" cy="12" r="2" fill={active ? '#1A1A1A' : '#9B9B9B'} stroke="none"/>
+              <circle cx="9" cy="18" r="2" fill={active ? '#1A1A1A' : '#9B9B9B'} stroke="none"/>
+            </svg>
+          )},
+          { id: 'settings', label: 'Settings', icon: (active: boolean) => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? '#1A1A1A' : '#9B9B9B'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+          )},
+        ] as { id: Tab; label: string; icon: (active: boolean) => React.ReactNode }[]).map(({ id, label, icon }) => (
+          <button key={id} onClick={() => setTab(id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 0 4px', border: 'none', background: 'transparent', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <div style={{ width: 36, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: tab === id ? '#F0F0EE' : 'transparent', transition: 'background 0.15s' }}>
+              {icon(tab === id)}
+            </div>
+            <span style={{ fontSize: 10, fontWeight: tab === id ? 600 : 400, color: tab === id ? '#1A1A1A' : '#9B9B9B' }}>{label}</span>
           </button>
         ))}
       </div>
