@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useScript } from '../contexts/ScriptContext';
 import type { RehearsalMode } from '../types/index';
 import { ELEVENLABS_VOICES, DEFAULT_VOICE_ID } from '../lib/elevenlabs';
@@ -37,8 +37,16 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
     elevenLabsKey, setElevenLabsKey,
     elevenLabsVoice, setElevenLabsVoice,
   } = useScript();
-  const [keyDraft, setKeyDraft] = useState(elevenLabsKey);
-  const [keyVisible, setKeyVisible] = useState(false);
+  const [keyDraft, setKeyDraft] = useState(elevenLabsKey ?? '');
+  const [keyVisible, setKeyVisible] = useState(true);
+  const [savedConfirm, setSavedConfirm] = useState(false);
+
+  const handleSaveKey = useCallback(() => {
+    const trimmed = keyDraft.trim();
+    setElevenLabsKey(trimmed);
+    setSavedConfirm(true);
+    setTimeout(() => setSavedConfirm(false), 2000);
+  }, [keyDraft, setElevenLabsKey]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--color-bg)' }}>
@@ -113,11 +121,20 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
           {/* API key input */}
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             <input
-              type={keyVisible ? 'text' : 'password'}
+              type="text"
               value={keyDraft}
               onChange={e => setKeyDraft(e.target.value)}
               placeholder="Paste ElevenLabs API key…"
-              style={{ flex: 1, border: '1px solid #E5E4E0', borderRadius: 8, padding: '9px 11px', fontSize: 12, outline: 'none', fontFamily: "'DM Sans', sans-serif", background: '#fff' }}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              style={{
+                flex: 1, border: '1px solid #E5E4E0', borderRadius: 8,
+                padding: '9px 11px', fontSize: 12, outline: 'none',
+                fontFamily: "'DM Sans', sans-serif", background: '#fff',
+                letterSpacing: keyVisible ? 'normal' : '0.15em',
+              }}
             />
             <button
               onClick={() => setKeyVisible(v => !v)}
@@ -129,10 +146,10 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
 
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
             <button
-              onClick={() => setElevenLabsKey(keyDraft)}
-              style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, background: '#1A1A1A', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+              onClick={handleSaveKey}
+              style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, background: savedConfirm ? '#3B6D11' : '#1A1A1A', color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'background 0.2s' }}
             >
-              Save key
+              {savedConfirm ? 'Saved ✓' : 'Save key'}
             </button>
             {elevenLabsKey && (
               <button
