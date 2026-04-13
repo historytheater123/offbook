@@ -14,6 +14,7 @@ export function ScriptUpload() {
   const { uploadScript, parsedScript } = useScript();
   const [text, setText] = useState(parsedScript?.rawText || '');
   const [validation, setValidation] = useState<{ valid: boolean; error?: string; lineCount?: number; characterCount?: number } | null>(null);
+  const [exampleSelected, setExampleSelected] = useState(false);
 
   useEffect(() => {
     if (text.trim().length > 20) {
@@ -66,26 +67,38 @@ export function ScriptUpload() {
 
         <hr style={{ border: 'none', borderTop: '1px solid #E5E4E0', margin: '4px 0' }} />
 
-        <div>
-          <div style={{ fontFamily: "'Source Serif 4', serif", fontWeight: 500, fontSize: 16, color: '#1A1A1A', marginBottom: 10 }}>Or try an example</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {scriptLibrary.map((script, i) => (
-              <button
-                key={script.id}
-                onClick={() => setText(script.rawText)}
-                style={{ background: '#fff', border: '1px solid #E5E4E0', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer' }}
-              >
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: AVATAR_COLORS[i % AVATAR_COLORS.length], color: AVATAR_TEXT[i % AVATAR_TEXT.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>
-                  {getInitials(script.title)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{script.title}</div>
-                  <div style={{ fontSize: 11, color: '#9B9B9B', marginTop: 1 }}>{script.author} — {script.characterCount} characters</div>
-                </div>
-              </button>
-            ))}
+        {exampleSelected ? (
+          <button
+            onClick={() => { setText(''); setExampleSelected(false); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#6B6B6B', fontSize: 13 }}
+          >
+            <span style={{ display: 'inline-block', width: 16, height: 16, position: 'relative', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: 2, width: 9, height: 9, borderLeft: '2px solid #6B6B6B', borderBottom: '2px solid #6B6B6B', transform: 'rotate(45deg)', display: 'block' }} />
+            </span>
+            Back to examples
+          </button>
+        ) : (
+          <div>
+            <div style={{ fontFamily: "'Source Serif 4', serif", fontWeight: 500, fontSize: 16, color: '#1A1A1A', marginBottom: 10 }}>Or try an example</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {scriptLibrary.map((script, i) => (
+                <button
+                  key={script.id}
+                  onClick={() => { setText(script.rawText); setExampleSelected(true); }}
+                  style={{ background: '#fff', border: '1px solid #E5E4E0', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: AVATAR_COLORS[i % AVATAR_COLORS.length], color: AVATAR_TEXT[i % AVATAR_TEXT.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 13, flexShrink: 0 }}>
+                    {getInitials(script.title)}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{script.title}</div>
+                    <div style={{ fontSize: 11, color: '#9B9B9B', marginTop: 1 }}>{script.author} — {script.characterCount} characters</div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
