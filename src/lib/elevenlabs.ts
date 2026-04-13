@@ -66,8 +66,23 @@ export async function speakWithElevenLabs(
   return new Promise((resolve) => {
     const audio = new Audio(audioUrl);
     currentAudio = audio;
-    audio.onended = () => { URL.revokeObjectURL(audioUrl); currentAudio = null; resolve(); };
-    audio.onerror = () => { URL.revokeObjectURL(audioUrl); currentAudio = null; resolve(); };
-    audio.play().catch(() => resolve());
+
+    let resolved = false;
+    const done = () => {
+      if (!resolved) {
+        resolved = true;
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        resolve();
+      }
+    };
+
+    audio.onended = done;
+    audio.onerror = done;
+    audio.play().catch(done);
+
+    // Safety: resolve after estimated duration + buffer even if events don't fire
+    const safetyMs = Math.max(5000, text.length * 80);
+    setTimeout(done, safetyMs);
   });
 }

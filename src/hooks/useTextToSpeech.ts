@@ -50,10 +50,18 @@ export function useTextToSpeech(elevenLabsKey?: string, voiceId?: string) {
         utterance.volume = 1;
         const voice = pickSystemVoice();
         if (voice) utterance.voice = voice;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
+
+        let resolved = false;
+        const done = () => { if (!resolved) { resolved = true; resolve(); } };
+
+        utterance.onend = done;
+        utterance.onerror = done;
         utteranceRef.current = utterance;
         window.speechSynthesis.speak(utterance);
+
+        // Safety timeout: if onend never fires (common on iOS), resolve after estimated duration
+        const safetyMs = Math.max(3000, text.length * 70);
+        setTimeout(done, safetyMs);
       };
 
       const voices = window.speechSynthesis.getVoices();
@@ -65,10 +73,8 @@ export function useTextToSpeech(elevenLabsKey?: string, voiceId?: string) {
           doSpeak();
         };
         setTimeout(() => {
-          if (utteranceRef.current === null) {
-            window.speechSynthesis.onvoiceschanged = null;
-            doSpeak();
-          }
+          window.speechSynthesis.onvoiceschanged = null;
+          doSpeak();
         }, 500);
       }
     });
