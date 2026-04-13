@@ -156,7 +156,7 @@ export function Rehearsal() {
 
     // Always read other characters' lines aloud; always advance even if TTS fails
     const minPause = new Promise<void>(r => setTimeout(r, 800));
-    Promise.all([speak(currentLine.text).catch(() => {}), minPause]).then(doNext);
+    Promise.all([speak(currentLine.text).catch(() => { /* already fell back to Web Speech */ }), minPause]).then(doNext);
 
     return () => { cancelled = true; cancel(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -31,13 +31,7 @@ function pickSystemVoice(): SpeechSynthesisVoice | null {
 export function useTextToSpeech(elevenLabsKey?: string, voiceId?: string) {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  const speak = useCallback((text: string): Promise<void> => {
-    // Use ElevenLabs if a key is configured
-    if (elevenLabsKey?.trim()) {
-      return speakWithElevenLabs(text, elevenLabsKey.trim(), voiceId || DEFAULT_VOICE_ID);
-    }
-
-    // Fallback: Web Speech API
+  const speakWebSpeech = useCallback((text: string): Promise<void> => {
     return new Promise((resolve) => {
       if (!window.speechSynthesis) { resolve(); return; }
 
@@ -78,7 +72,16 @@ export function useTextToSpeech(elevenLabsKey?: string, voiceId?: string) {
         }, 500);
       }
     });
-  }, [elevenLabsKey, voiceId]);
+  }, []);
+
+  const speak = useCallback((text: string): Promise<void> => {
+    // Try ElevenLabs first; fall back to Web Speech if it fails or no key
+    if (elevenLabsKey?.trim()) {
+      return speakWithElevenLabs(text, elevenLabsKey.trim(), voiceId || DEFAULT_VOICE_ID)
+        .catch(() => speakWebSpeech(text));
+    }
+    return speakWebSpeech(text);
+  }, [elevenLabsKey, voiceId, speakWebSpeech]);
 
   const cancel = useCallback(() => {
     cancelElevenLabs();
