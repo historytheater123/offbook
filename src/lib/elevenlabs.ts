@@ -16,38 +16,37 @@ export const ELEVENLABS_VOICES: ElevenLabsVoice[] = [
 
 export const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel
 
-let currentAudio: HTMLAudioElement | null = null;
+// Persistent AudioContext — unlocked once via user gesture, usable forever after.
+// iOS Safari blocks HTMLAudioElement.play() when not in a gesture frame, but
+// AudioContext.createBufferSource().start() works as long as the context is running.
+let audioCtx: AudioContext | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
 
 /**
- * iOS/Safari blocks HTMLAudioElement.play() unless the call originates from a
- * user-gesture frame. Call this once from a button-tap handler to "unlock"
- * the audio context so subsequent automatic plays (e.g. TTS) work.
+ * Call this synchronously inside a user-gesture handler (e.g. mic button tap).
+ * Creates + resumes an AudioContext so all subsequent TTS playback works on iOS.
  */
 export function unlockAudio(): void {
-  // Play a silent, zero-duration audio blob to satisfy the autoplay policy.
-  // After this, all future Audio().play() calls succeed even without a gesture.
   try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    const buffer = ctx.createBuffer(1, 1, 22050);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-    source.start(0);
-    source.onended = () => ctx.close();
-  } catch {
-    // Fallback: play a silent Audio element
-    const silent = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-    silent.volume = 0;
-    silent.play().catch(() => {});
-  }
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!audioCtx || audioCtx.state === 'closed') {
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    // Play a silent 1-frame buffer — fully activates the context on iOS
+    const buf = audioCtx.createBuffer(1, 1, 22050);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx.destination);
+    src.start(0);
+  } catch { /* ignore */ }
 }
 
-export function cancelElevenLabs() {
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.src = '';
-    currentAudio = null;
-  }
+export function cancelElevenLabs(): void {
+  try { currentSource?.stop(); } catch { /* ignore */ }
+  currentSource = null;
 }
 
 export async function speakWithElevenLabs(
@@ -55,7 +54,6 @@ export async function speakWithElevenLabs(
   apiKey: string,
   voiceId = DEFAULT_VOICE_ID,
 ): Promise<void> {
-  // Cancel any ongoing playback
   cancelElevenLabs();
 
   const response = await fetch(
@@ -84,29 +82,43 @@ export async function speakWithElevenLabs(
     throw new Error(`ElevenLabs ${response.status}: ${await response.text()}`);
   }
 
-  const blob = await response.blob();
+  const arrayBuffer = await response.arrayBuffer();
+
+  // --- AudioContext path (iOS-safe) ---
+  if (audioCtx && audioCtx.state === 'running') {
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    return new Promise((resolve) => {
+      const safetyMs = Math.max(5000, text.length * 80);
+      let resolved = false;
+      const done = () => { if (!resolved) { resolved = true; resolve(); } };
+
+      const src = audioCtx!.createBufferSource();
+      src.buffer = audioBuffer;
+      src.connect(audioCtx!.destination);
+      src.onended = done;
+      src.start(0);
+      currentSource = src;
+      setTimeout(done, safetyMs);
+    });
+  }
+
+  // --- Fallback: HTMLAudioElement (desktop / Android) ---
+  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
   const audioUrl = URL.createObjectURL(blob);
 
   return new Promise((resolve) => {
     const audio = new Audio(audioUrl);
-    currentAudio = audio;
-
     let resolved = false;
     const done = () => {
       if (!resolved) {
         resolved = true;
         URL.revokeObjectURL(audioUrl);
-        currentAudio = null;
         resolve();
       }
     };
-
     audio.onended = done;
     audio.onerror = done;
     audio.play().catch(done);
-
-    // Safety: resolve after estimated duration + buffer even if events don't fire
-    const safetyMs = Math.max(5000, text.length * 80);
-    setTimeout(done, safetyMs);
+    setTimeout(done, Math.max(5000, text.length * 80));
   });
 }
