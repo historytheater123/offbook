@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useScript } from '../contexts/ScriptContext';
 import type { RehearsalMode } from '../types/index';
-import { ELEVENLABS_VOICES, DEFAULT_VOICE_ID } from '../lib/elevenlabs';
 
 export type Tab = 'script' | 'modes' | 'settings';
 
@@ -40,47 +39,50 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
   const [keyDraft, setKeyDraft] = useState(elevenLabsKey ?? '');
   const [keyVisible, setKeyVisible] = useState(true);
   const [savedConfirm, setSavedConfirm] = useState(false);
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
-  const [testError, setTestError] = useState('');
+  const [availableVoices, setAvailableVoices] = useState<{ voice_id: string; name: string }[]>([]);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+  const [voicesError, setVoicesError] = useState('');
+
+  // Load voices whenever key changes
+  const loadVoices = useCallback(async (key: string) => {
+    if (!key.trim()) { setAvailableVoices([]); return; }
+    setVoicesLoading(true);
+    setVoicesError('');
+    try {
+      const res = await fetch('https://api.elevenlabs.io/v1/voices', {
+        headers: { 'xi-api-key': key.trim() },
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`${res.status}: ${msg}`);
+      }
+      const data = await res.json();
+      const voices = (data.voices || []) as { voice_id: string; name: string }[];
+      setAvailableVoices(voices);
+      // Auto-select first if none selected or current selection not in list
+      if (voices.length > 0) {
+        const ids = voices.map((v: { voice_id: string }) => v.voice_id);
+        if (!elevenLabsVoice || !ids.includes(elevenLabsVoice)) {
+          setElevenLabsVoice(voices[0].voice_id);
+        }
+      }
+    } catch (e) {
+      setVoicesError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setVoicesLoading(false);
+    }
+  }, [elevenLabsVoice, setElevenLabsVoice]);
+
+  // Load voices on mount if key already saved
+  useState(() => { if (elevenLabsKey) loadVoices(elevenLabsKey); });
 
   const handleSaveKey = useCallback(() => {
     const trimmed = keyDraft.trim();
     setElevenLabsKey(trimmed);
     setSavedConfirm(true);
-    setTestStatus('idle');
     setTimeout(() => setSavedConfirm(false), 2000);
-  }, [keyDraft, setElevenLabsKey]);
-
-  const handleTestVoice = useCallback(async () => {
-    const key = (elevenLabsKey || keyDraft).trim();
-    if (!key) return;
-    setTestStatus('testing');
-    setTestError('');
-    try {
-      const res = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM`,
-        {
-          method: 'POST',
-          headers: { 'Accept': 'audio/mpeg', 'Content-Type': 'application/json', 'xi-api-key': key },
-          body: JSON.stringify({ text: 'Testing voice.', model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.5, similarity_boost: 0.8 } }),
-        }
-      );
-      if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`${res.status}: ${msg}`);
-      }
-      const buf = await res.arrayBuffer();
-      const blob = new Blob([buf], { type: 'audio/mpeg' });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => URL.revokeObjectURL(url);
-      await audio.play();
-      setTestStatus('ok');
-    } catch (e) {
-      setTestStatus('error');
-      setTestError(e instanceof Error ? e.message : String(e));
-    }
-  }, [elevenLabsKey, keyDraft]);
+    loadVoices(trimmed);
+  }, [keyDraft, setElevenLabsKey, loadVoices]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--color-bg)' }}>
@@ -185,27 +187,18 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
             >
               {savedConfirm ? 'Saved ✓' : 'Save key'}
             </button>
-            {(elevenLabsKey || keyDraft.trim()) && (
-              <button
-                onClick={handleTestVoice}
-                disabled={testStatus === 'testing'}
-                style={{ padding: '8px 12px', border: '1px solid #534AB7', borderRadius: 8, background: testStatus === 'ok' ? '#EAF3DE' : '#fff', fontSize: 12, cursor: 'pointer', color: testStatus === 'ok' ? '#3B6D11' : '#534AB7', fontWeight: 500 }}
-              >
-                {testStatus === 'testing' ? '…' : testStatus === 'ok' ? '✓ Works' : 'Test'}
-              </button>
-            )}
             {elevenLabsKey && (
               <button
-                onClick={() => { setKeyDraft(''); setElevenLabsKey(''); setTestStatus('idle'); }}
+                onClick={() => { setKeyDraft(''); setElevenLabsKey(''); setAvailableVoices([]); }}
                 style={{ padding: '8px 12px', border: '1px solid #E5E4E0', borderRadius: 8, background: 'transparent', fontSize: 12, cursor: 'pointer', color: '#993C1D' }}
               >
                 Remove
               </button>
             )}
           </div>
-          {testStatus === 'error' && (
+          {voicesError && (
             <div style={{ marginTop: 6, fontSize: 11, color: '#993C1D', background: '#FAECE7', borderRadius: 6, padding: '6px 10px', wordBreak: 'break-all' }}>
-              ⚠ {testError}
+              ⚠ {voicesError}
             </div>
           )}
 
@@ -219,28 +212,30 @@ export function ModesSettings({ tab, onTabChange }: ModesSettingsProps) {
           </a>
         </div>
 
-        {/* Voice picker — only shown when key is set */}
+        {/* Voice picker — shows voices fetched from user's ElevenLabs account */}
         {elevenLabsKey && (
           <div style={{ marginTop: 4 }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: '#1A1A1A', marginBottom: 8 }}>Voice</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#1A1A1A', marginBottom: 8 }}>
+              Voice {voicesLoading && <span style={{ color: '#9B9B9B', fontWeight: 400 }}>loading…</span>}
+            </div>
+            {availableVoices.length === 0 && !voicesLoading && !voicesError && (
+              <div style={{ fontSize: 11, color: '#9B9B9B' }}>No voices found — try re-saving your key.</div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {ELEVENLABS_VOICES.map(v => (
+              {availableVoices.map(v => (
                 <button
-                  key={v.id}
-                  onClick={() => setElevenLabsVoice(v.id)}
+                  key={v.voice_id}
+                  onClick={() => setElevenLabsVoice(v.voice_id)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '10px 12px', borderRadius: 8, border: '1px solid',
-                    borderColor: (elevenLabsVoice || DEFAULT_VOICE_ID) === v.id ? '#1A1A1A' : '#E5E4E0',
-                    background: (elevenLabsVoice || DEFAULT_VOICE_ID) === v.id ? '#F7F6F3' : '#fff',
+                    borderColor: elevenLabsVoice === v.voice_id ? '#1A1A1A' : '#E5E4E0',
+                    background: elevenLabsVoice === v.voice_id ? '#F7F6F3' : '#fff',
                     cursor: 'pointer', textAlign: 'left',
                   }}
                 >
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{v.name}</div>
-                    <div style={{ fontSize: 11, color: '#9B9B9B' }}>{v.description}</div>
-                  </div>
-                  {(elevenLabsVoice || DEFAULT_VOICE_ID) === v.id && (
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{v.name}</div>
+                  {elevenLabsVoice === v.voice_id && (
                     <span style={{ fontSize: 14, color: '#1A1A1A' }}>✓</span>
                   )}
                 </button>
