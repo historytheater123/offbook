@@ -42,8 +42,9 @@ export function Rehearsal() {
   const [userInput, setUserInput] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [tab, setTab] = useState<Tab>('script');
-  // sessionActive: user pressed mic once; keeps listening through all their lines
   const [sessionActive, setSessionActive] = useState(false);
+  // countdown: 3 → 2 → 1 → null (null means running or not started)
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const startTimeRef = useRef(Date.now());
   const lineScoresRef = useRef<Record<string, number>>({});
@@ -140,9 +141,9 @@ export function Rehearsal() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitted, currentLineIndex]);
 
-  // Handle other character's lines: speak then advance
+  // Handle other character's lines: speak then advance — only once session has started
   useEffect(() => {
-    if (!currentLine || isMyLine) return;
+    if (!currentLine || isMyLine || !sessionActive) return;
 
     // Stop recognition while other character is speaking
     if (isListening) { stopListening(); resetSpeech(); }
@@ -160,7 +161,7 @@ export function Rehearsal() {
 
     return () => { cancelled = true; cancel(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLineIndex]);
+  }, [currentLineIndex, sessionActive]);
 
   // Continuous session: auto-(re)start recognition when it's the player's turn
   useEffect(() => {
@@ -209,19 +210,60 @@ export function Rehearsal() {
   const handleMicToggle = () => {
     if (sessionActive) {
       setSessionActive(false);
+      setCountdown(null);
       stopListening();
       resetSpeech();
-    } else {
-      // Unlock audio on iOS — must happen inside a user-gesture handler (this tap)
+      cancel();
+    } else if (countdown === null) {
+      // Unlock audio on iOS — must happen synchronously inside a user-gesture handler
       unlockAudio();
-      setSessionActive(true);
-      // Effect will auto-start if isMyLine; if not, it waits
+      // 3-2-1 countdown then start
+      setCountdown(3);
     }
   };
 
+  // Drive the countdown ticker
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const t = setTimeout(() => {
+      if (countdown === 1) {
+        setCountdown(null);
+        setSessionActive(true);
+        startTimeRef.current = Date.now();
+      } else {
+        setCountdown(c => (c ?? 1) - 1);
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
   return (
-    // height: 100dvh keeps header + bottom bar always on screen
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: 'var(--color-bg)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', background: 'var(--color-bg)', position: 'relative' }}>
+
+      {/* 3-2-1 countdown overlay */}
+      {countdown !== null && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 50,
+          background: 'rgba(26,26,26,0.82)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div key={countdown} style={{
+            fontSize: 96, fontWeight: 700, color: '#fff',
+            fontFamily: "'Source Serif 4', serif",
+            animation: 'countPop 0.9s ease-out forwards',
+          }}>
+            {countdown}
+          </div>
+          <style>{`
+            @keyframes countPop {
+              0%   { transform: scale(1.4); opacity: 1; }
+              80%  { transform: scale(0.95); opacity: 1; }
+              100% { transform: scale(0.9); opacity: 0; }
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E4E0', background: '#fff', flexShrink: 0 }}>
@@ -337,7 +379,7 @@ export function Rehearsal() {
           </>
         ) : (
           <div style={{ flex: 1, padding: '4px 0', fontSize: 13, color: '#9B9B9B', fontFamily: "'DM Sans', sans-serif" }}>
-            {sessionActive ? (submitted ? 'Advancing…' : '🔊 Other character speaking…') : 'Tap Start to begin rehearsal'}
+            {sessionActive ? (submitted ? 'Advancing…' : '🔊 Other character speaking…') : countdown !== null ? 'Get ready…' : 'Tap Start to begin rehearsal'}
           </div>
         )}
         {isSupported && (
@@ -347,6 +389,13 @@ export function Rehearsal() {
               style={{ padding: '10px 20px', background: '#E53E3E', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, letterSpacing: '0.02em' }}
             >
               ■ Stop
+            </button>
+          ) : countdown !== null ? (
+            <button
+              disabled
+              style={{ padding: '10px 20px', background: '#6B6B6B', color: '#fff', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 700, flexShrink: 0, minWidth: 60, textAlign: 'center', cursor: 'default' }}
+            >
+              {countdown}
             </button>
           ) : (
             <button
