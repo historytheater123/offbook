@@ -4,6 +4,7 @@ import { compareLine } from '../lib/lineCompare';
 import { MicButton } from '../components/MicButton';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
+import { unlockAudio } from '../lib/elevenlabs';
 import { ModesSettings } from './ModesSettings';
 import type { Tab } from './ModesSettings';
 
@@ -211,6 +212,8 @@ export function Rehearsal() {
       stopListening();
       resetSpeech();
     } else {
+      // Unlock audio on iOS — must happen inside a user-gesture handler (this tap)
+      unlockAudio();
       setSessionActive(true);
       // Effect will auto-start if isMyLine; if not, it waits
     }

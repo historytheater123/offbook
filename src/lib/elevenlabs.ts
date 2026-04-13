@@ -18,6 +18,30 @@ export const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel
 
 let currentAudio: HTMLAudioElement | null = null;
 
+/**
+ * iOS/Safari blocks HTMLAudioElement.play() unless the call originates from a
+ * user-gesture frame. Call this once from a button-tap handler to "unlock"
+ * the audio context so subsequent automatic plays (e.g. TTS) work.
+ */
+export function unlockAudio(): void {
+  // Play a silent, zero-duration audio blob to satisfy the autoplay policy.
+  // After this, all future Audio().play() calls succeed even without a gesture.
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    source.onended = () => ctx.close();
+  } catch {
+    // Fallback: play a silent Audio element
+    const silent = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+    silent.volume = 0;
+    silent.play().catch(() => {});
+  }
+}
+
 export function cancelElevenLabs() {
   if (currentAudio) {
     currentAudio.pause();
