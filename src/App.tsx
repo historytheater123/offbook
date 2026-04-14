@@ -1,5 +1,7 @@
 import { ScriptProvider, useScript } from './contexts/ScriptContext';
-import { Splash } from './screens/Splash';
+import { Landing } from './screens/Landing';
+import { Auth } from './screens/Auth';
+import { Dashboard } from './screens/Dashboard';
 import { ScriptUpload } from './screens/ScriptUpload';
 import { CharacterSelect } from './screens/CharacterSelect';
 import { SceneSelect } from './screens/SceneSelect';
@@ -9,13 +11,15 @@ import { RunStats } from './screens/RunStats';
 function StepRenderer() {
   const { currentStep } = useScript();
   switch (currentStep) {
-    case 'splash': return <Splash />;
-    case 'upload': return <ScriptUpload />;
+    case 'landing':         return <Landing />;
+    case 'auth':            return <Auth />;
+    case 'dashboard':       return <Dashboard />;
+    case 'upload':          return <ScriptUpload />;
     case 'character-select': return <CharacterSelect />;
-    case 'scene-select': return <SceneSelect />;
-    case 'rehearsal': return <Rehearsal />;
-    case 'stats': return <RunStats />;
-    default: return <Splash />;
+    case 'scene-select':    return <SceneSelect />;
+    case 'rehearsal':       return <Rehearsal />;
+    case 'stats':           return <RunStats />;
+    default:                return <Landing />;
   }
 }
 

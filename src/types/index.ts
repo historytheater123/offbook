@@ -66,7 +66,7 @@ export interface PersistedData {
 
 export type RehearsalMode = 'prompter' | 'highlight' | 'hidden-lines' | 'cue-only' | 'full-blackout';
 
-export type AppStep = 'splash' | 'upload' | 'character-select' | 'scene-select' | 'rehearsal' | 'stats';
+export type AppStep = 'landing' | 'auth' | 'dashboard' | 'upload' | 'character-select' | 'scene-select' | 'rehearsal' | 'stats';
 
 export interface RehearsalState {
   currentStep: AppStep;

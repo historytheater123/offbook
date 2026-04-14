@@ -11,7 +11,7 @@ function getInitials(title: string) {
 }
 
 export function ScriptUpload() {
-  const { uploadScript, parsedScript } = useScript();
+  const { uploadScript, parsedScript, setCurrentStep } = useScript();
   const [text, setText] = useState(parsedScript?.rawText || '');
   const [validation, setValidation] = useState<{ valid: boolean; error?: string; lineCount?: number; characterCount?: number } | null>(null);
   const [exampleSelected, setExampleSelected] = useState(false);
@@ -27,8 +27,13 @@ export function ScriptUpload() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--color-bg)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '24px 20px 20px', gap: 16 }}>
-        <div style={{ fontFamily: "'Source Serif 4', serif", fontWeight: 600, fontSize: 18, color: '#1A1A1A', display: 'flex', alignItems: 'center' }}>
-          <span style={{ display: 'inline-block', transform: 'rotate(-8deg)', transformOrigin: 'center', marginRight: 1 }}>O</span>ffBook
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontFamily: "'Source Serif 4', serif", fontWeight: 600, fontSize: 18, color: '#1A1A1A', display: 'flex', alignItems: 'center' }}>
+            <span style={{ display: 'inline-block', transform: 'rotate(-8deg)', transformOrigin: 'center', marginRight: 1 }}>O</span>ffBook
+          </div>
+          <button onClick={() => setCurrentStep('dashboard')} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, color: '#9B9B9B', display: 'flex', alignItems: 'center', gap: 4 }}>
+            ← Dashboard
+          </button>
         </div>
 
         <div>

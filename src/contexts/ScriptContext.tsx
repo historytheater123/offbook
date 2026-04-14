@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import type { User } from '@supabase/supabase-js';
 import type { ParsedScript, Scene, AppStep, RehearsalMode, PersistedData } from '../types';
 import { parseScript, hashScript } from '../lib/scriptParser';
 import { decodeScriptFromUrl } from '../lib/shareUrl';
+import { supabase } from '../lib/supabase';
 
 const STORAGE_KEY = 'offbook_data';
 
@@ -10,7 +12,6 @@ function loadPersistedData(): PersistedData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const data = JSON.parse(raw) as PersistedData;
-      // Migrate: always force TTS on — reading partner lines aloud is core behaviour
       if (!data.settings) {
         data.settings = { enableTTS: true, autoAdvance: true, loopTroubleLines: false, defaultMode: 'prompter' };
       } else {
@@ -21,42 +22,42 @@ function loadPersistedData(): PersistedData {
   } catch { /* ignore */ }
   return {
     scripts: {},
-    settings: {
-      enableTTS: true,
-      autoAdvance: true,
-      loopTroubleLines: false,
-      defaultMode: 'prompter',
-    },
+    settings: { enableTTS: true, autoAdvance: true, loopTroubleLines: false, defaultMode: 'prompter' },
   };
 }
 
 function savePersistedData(data: PersistedData) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch { /* ignore */ }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* ignore */ }
 }
 
-export interface RunAttempt {
-  said: string;
-  accuracy: number;
-}
+export interface RunAttempt { said: string; accuracy: number; }
 
 interface ScriptContextValue {
+  // Auth
+  user: User | null;
+  authMode: 'signup' | 'login';
+  setUser: (u: User | null) => void;
+  setAuthMode: (m: 'signup' | 'login') => void;
+  // Navigation
   currentStep: AppStep;
+  setCurrentStep: (step: AppStep) => void;
+  // Script
   parsedScript: ParsedScript | null;
   selectedCharacter: string | null;
   selectedScene: Scene | null;
   currentLineIndex: number;
+  // Rehearsal settings
   rehearsalMode: RehearsalMode;
   enableTTS: boolean;
   autoAdvance: boolean;
   loopTroubleLines: boolean;
-  persistedData: PersistedData;
-  runAttempts: Record<string, RunAttempt>;
   elevenLabsKey: string;
   elevenLabsVoice: string;
-  setCurrentStep: (step: AppStep) => void;
-  uploadScript: (rawText: string) => void;
+  // Persisted
+  persistedData: PersistedData;
+  runAttempts: Record<string, RunAttempt>;
+  // Actions
+  uploadScript: (rawText: string, parsed?: ParsedScript) => void;
   selectCharacter: (name: string) => void;
   selectScene: (scene: Scene) => void;
   setRehearsalMode: (mode: RehearsalMode) => void;
@@ -77,7 +78,9 @@ const ScriptContext = createContext<ScriptContextValue | null>(null);
 
 export function ScriptProvider({ children }: { children: React.ReactNode }) {
   const [persisted, setPersisted] = useState<PersistedData>(loadPersistedData);
-  const [currentStep, setCurrentStep] = useState<AppStep>('splash');
+  const [user, setUserState] = useState<User | null>(null);
+  const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup');
+  const [currentStep, setCurrentStep] = useState<AppStep>('landing');
   const [parsedScript, setParsedScript] = useState<ParsedScript | null>(null);
   const [selectedCharacter, setSelectedCharacter] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
@@ -92,6 +95,25 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
   const [elevenLabsVoice, setElevenLabsVoiceState] = useState(persisted.settings.elevenLabsVoice || '');
   const [runAttempts, setRunAttempts] = useState<Record<string, RunAttempt>>({});
 
+  // Check for existing session on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUserState(session.user);
+        setCurrentStep('dashboard');
+      }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUserState(session.user);
+      } else {
+        setUserState(null);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle deep-linked scripts
   useEffect(() => {
     const decoded = decodeScriptFromUrl();
     if (decoded) {
@@ -104,16 +126,27 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const setUser = useCallback((u: User | null) => setUserState(u), []);
+
   const savePersisted = useCallback((data: PersistedData) => {
     setPersisted(data);
     savePersistedData(data);
   }, []);
 
-  const uploadScript = useCallback((rawText: string) => {
-    const parsed = parseScript(rawText);
+  const uploadScript = useCallback((rawText: string, alreadyParsed?: ParsedScript) => {
+    const parsed = alreadyParsed || parseScript(rawText);
     setParsedScript(parsed);
+
+    // Save to Supabase in the background (fire and forget)
+    if (user) {
+      supabase.from('scripts').insert({
+        user_id: user.id,
+        title: parsed.title || 'Untitled',
+        raw_text: rawText,
+      }).then(({ error }) => { if (error) console.warn('Script save error:', error.message); });
+    }
     setCurrentStep('character-select');
-  }, []);
+  }, [user]);
 
   const selectCharacter = useCallback((name: string) => {
     setSelectedCharacter(name);
@@ -161,18 +194,10 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     const key = hashScript(parsedScript.rawText);
     const updated = { ...persisted };
     if (!updated.scripts[key]) {
-      updated.scripts[key] = {
-        title: parsedScript.title,
-        rawText: parsedScript.rawText,
-        lastCharacter: selectedCharacter || '',
-        lastScene: selectedScene.id,
-        scenes: {},
-      };
+      updated.scripts[key] = { title: parsedScript.title, rawText: parsedScript.rawText, lastCharacter: selectedCharacter || '', lastScene: selectedScene.id, scenes: {} };
     }
     if (!updated.scripts[key].scenes[selectedScene.id]) {
-      updated.scripts[key].scenes[selectedScene.id] = {
-        bestAccuracy: 0, runCount: 0, lastRunDate: '', lineAccuracies: {}, bestTime: 0,
-      };
+      updated.scripts[key].scenes[selectedScene.id] = { bestAccuracy: 0, runCount: 0, lastRunDate: '', lineAccuracies: {}, bestTime: 0 };
     }
     const sceneData = updated.scripts[key].scenes[selectedScene.id];
     if (!sceneData.lineAccuracies[lineId]) sceneData.lineAccuracies[lineId] = [];
@@ -185,15 +210,10 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     const key = hashScript(parsedScript.rawText);
     const updated = { ...persisted };
     if (!updated.scripts[key]) {
-      updated.scripts[key] = {
-        title: parsedScript.title, rawText: parsedScript.rawText,
-        lastCharacter: selectedCharacter || '', lastScene: selectedScene.id, scenes: {},
-      };
+      updated.scripts[key] = { title: parsedScript.title, rawText: parsedScript.rawText, lastCharacter: selectedCharacter || '', lastScene: selectedScene.id, scenes: {} };
     }
     if (!updated.scripts[key].scenes[selectedScene.id]) {
-      updated.scripts[key].scenes[selectedScene.id] = {
-        bestAccuracy: 0, runCount: 0, lastRunDate: '', lineAccuracies: {}, bestTime: 0,
-      };
+      updated.scripts[key].scenes[selectedScene.id] = { bestAccuracy: 0, runCount: 0, lastRunDate: '', lineAccuracies: {}, bestTime: 0 };
     }
     const sceneData = updated.scripts[key].scenes[selectedScene.id];
     sceneData.runCount++;
@@ -201,7 +221,18 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     if (accuracy > sceneData.bestAccuracy) sceneData.bestAccuracy = accuracy;
     if (time > 0 && (sceneData.bestTime === 0 || time < sceneData.bestTime)) sceneData.bestTime = time;
     savePersisted(updated);
-  }, [parsedScript, selectedScene, selectedCharacter, persisted, savePersisted]);
+
+    // Save to Supabase in the background
+    if (user) {
+      supabase.from('run_attempts').insert({
+        user_id: user.id,
+        scene_name: selectedScene.title,
+        character_name: selectedCharacter || '',
+        accuracy,
+        duration_seconds: time,
+      }).then(({ error }) => { if (error) console.warn('Run save error:', error.message); });
+    }
+  }, [parsedScript, selectedScene, selectedCharacter, persisted, savePersisted, user]);
 
   const getSceneProgress = useCallback((sceneId: string) => {
     const key = getScriptKey();
@@ -217,12 +248,12 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ScriptContext.Provider value={{
-      currentStep, parsedScript, selectedCharacter, selectedScene,
-      currentLineIndex, rehearsalMode, enableTTS, autoAdvance, loopTroubleLines,
-      persistedData: persisted,
-      runAttempts,
-      elevenLabsKey, elevenLabsVoice,
-      setCurrentStep, uploadScript, selectCharacter, selectScene,
+      user, authMode, setUser, setAuthMode,
+      currentStep, setCurrentStep,
+      parsedScript, selectedCharacter, selectedScene, currentLineIndex,
+      rehearsalMode, enableTTS, autoAdvance, loopTroubleLines, elevenLabsKey, elevenLabsVoice,
+      persistedData: persisted, runAttempts,
+      uploadScript, selectCharacter, selectScene,
       setRehearsalMode, setCurrentLineIndex,
       setEnableTTS, setAutoAdvance, setLoopTroubleLines,
       setElevenLabsKey, setElevenLabsVoice,
